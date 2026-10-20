@@ -181,8 +181,15 @@ async def analyze_single_code(
                 "prediction": {
                     "heldOutMae": 0.045,
                     "trainingMae": 0.038,
-                    "spearman": benchmark.get("rankCorrelation", 0.85),
-                    "points": benchmark.get("correlationPoints", [])
+                    "points": [
+                        {
+                            **pt,
+                            "predictedPairSeconds": pt.get("predicted", 0),
+                            "measuredPairSeconds": pt.get("measured", 0)
+                        }
+                        for pt in benchmark.get("correlationPoints", [])
+                    ],
+                    "spearman": benchmark.get("rankCorrelation", 0.85)
                 },
                 "model": {
                     "architecture": "Compiler Worker SMT Contention Model",

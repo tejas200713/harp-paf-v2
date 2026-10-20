@@ -231,7 +231,11 @@ def compare_compilation(original_file, generated_dir, repetitions: int = 3):
             correlation_points.append({
                 "name": f"{mA['name']} + {mB['name']}",
                 "predicted": pred_cost,
-                "measured": meas_cost
+                "measured": meas_cost,
+                "predictedSlowdown": pred_slowdown,
+                "measuredSlowdown": meas_slowdown,
+                "soloA": mA["duration"],
+                "soloB": mB["duration"]
             })
 
     if len(correlation_points) >= 2:

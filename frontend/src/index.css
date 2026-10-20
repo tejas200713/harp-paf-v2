@@ -1,23 +1,45 @@
 
 /* HARP-PAF live pair-analysis heatmap */
-.heat-cell:not(.diagonal) {
-  background: #17354a !important;
-  color: #e4faff !important;
-  border: 1px solid #35536a;
+.heat-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: 'DM Mono', monospace, ui-monospace;
   font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.heat-cell:not(.diagonal) {
+  background: #142735;
+  color: #e4faff;
+  border: 1px solid #283a4c;
 }
 
 .heat-cell:not(.diagonal):hover {
-  background: #24516a !important;
+  filter: brightness(1.22);
+  transform: translateY(-1px);
 }
 
 .heat-cell.chosen {
-  background: #155e66 !important;
-  color: #ffffff !important;
   border: 2px solid #4bd6d2 !important;
+  box-shadow: 0 0 14px rgba(75, 214, 210, 0.5) !important;
+  outline: none !important;
+  background: #16333f !important;
+  color: #ffffff !important;
+  z-index: 2;
+  position: relative;
 }
 
 .heat-cell.diagonal {
-  background: #111b2b !important;
-  color: #718096 !important;
+  background: #0e1622 !important;
+  color: #52627a !important;
+  border-color: #1a2536 !important;
+  cursor: default !important;
+  font-size: 13px;
+  font-weight: 400;
 }
+
