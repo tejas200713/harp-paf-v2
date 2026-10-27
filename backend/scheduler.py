@@ -21,6 +21,7 @@ Ties are broken by longer solo time, then task ID.
 """
 
 from pathlib import Path
+import copy
 import random
 import sys
 import time
@@ -32,7 +33,55 @@ if str(_REPO_ROOT) not in sys.path:
 from backend.baselines import port_pressure
 from backend.execution import ProcessGroup, ProcessSpec
 from backend.features import pair_vector
+from backend.fusion import FEATURES, static_only
 from backend.model import slowdown_risk
+
+
+def build_ablation_profiles(characterized, mode="full"):
+    """Generate ablated workload characterization profiles for experimental comparison.
+
+    Modes:
+      'full':         Default adaptive fusion with phase-aware profiles.
+      'static_only':  Pure static compiler analysis (q = 0 everywhere).
+      'dynamic_only': Pure runtime microarchitectural telemetry (q = 1 wherever counters exist).
+      'no_phase':     Whole-program profiling collapsing execution phases into a single mean phase.
+    """
+    if mode == "full":
+        return characterized
+
+    ablated = copy.deepcopy(characterized)
+
+    if mode == "static_only":
+        for t, c in ablated.items():
+            c["fused"] = static_only(c["static"])
+    elif mode == "dynamic_only":
+        for t, c in ablated.items():
+            for p in c["fused"]["phases"]:
+                d = p.get("dynamic", {})
+                s = p.get("static", {})
+                q = {k: (1.0 if d.get(k) is not None else 0.0) for k in FEATURES}
+                x = {k: (d[k] if d.get(k) is not None else s[k]) for k in FEATURES}
+                p["confidence"] = q
+                p["fused"] = x
+            c["fused"]["meanConfidence"] = 1.0
+    elif mode == "no_phase":
+        for t, c in ablated.items():
+            phases = c["fused"]["phases"]
+            if len(phases) > 1:
+                avg_fused = {k: sum(p["share"] * p["fused"][k] for p in phases) for k in FEATURES}
+                c["fused"]["phases"] = [{
+                    "id": 0,
+                    "share": 1.0,
+                    "static": phases[0]["static"],
+                    "dynamic": phases[0].get("dynamic", {}),
+                    "confidence": phases[0]["confidence"],
+                    "fused": avg_fused,
+                }]
+                c["fused"]["segments"] = [{"start": 0.0, "end": 1.0, "phase": 0}]
+    else:
+        raise ValueError(f"Unknown ablation mode: {mode}")
+
+    return ablated
 
 
 class HarpPolicy:
@@ -61,6 +110,30 @@ class HarpPolicy:
         scored = {c: self.estimate(running, progress, c) for c in candidates}
         best = min(candidates, key=lambda c: (scored[c]["score"], -self.solo[c], c))
         return best, scored[best]["predictedSlowdown"]
+
+
+class HarpStaticOnlyPolicy(HarpPolicy):
+    """Ablation policy: pure static compiler instruction-mix profile (q = 0 everywhere)."""
+    name = "harp_static_only"
+
+    def __init__(self, characterized, model):
+        super().__init__(build_ablation_profiles(characterized, "static_only"), model)
+
+
+class HarpDynamicOnlyPolicy(HarpPolicy):
+    """Ablation policy: pure dynamic microarchitectural telemetry (q = 1 where available)."""
+    name = "harp_dynamic_only"
+
+    def __init__(self, characterized, model):
+        super().__init__(build_ablation_profiles(characterized, "dynamic_only"), model)
+
+
+class HarpNoPhasePolicy(HarpPolicy):
+    """Ablation policy: whole-program average profile disabling phase segmentation."""
+    name = "harp_no_phase"
+
+    def __init__(self, characterized, model):
+        super().__init__(build_ablation_profiles(characterized, "no_phase"), model)
 
 
 class PortPolicy:

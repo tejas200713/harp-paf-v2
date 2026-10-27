@@ -51,6 +51,9 @@ METHOD_LABELS = {
     "random": "Random",
     "linux": "OS default",
     "serial": "Serial (no SMT)",
+    "harp_static_only": "Ablation: Static-only (q=0)",
+    "harp_dynamic_only": "Ablation: Dynamic-only (q=1)",
+    "harp_no_phase": "Ablation: Whole-program (no phases)",
 }
 
 

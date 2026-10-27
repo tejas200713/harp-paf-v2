@@ -65,3 +65,49 @@ def test_summarize():
     assert "methods" in summary
     assert "harp" in summary["methods"]
     assert "comparisons" in summary
+
+
+def test_ablation_policies():
+    import json
+    from backend.scheduler import (
+        build_ablation_profiles,
+        HarpPolicy,
+        HarpStaticOnlyPolicy,
+        HarpDynamicOnlyPolicy,
+        HarpNoPhasePolicy,
+    )
+    from backend import config
+
+    # Load real experiment characterization
+    exp_file = config.BASE_DIR / "docs" / "results" / "experiment-8-workloads-10-reps.json"
+    data = json.loads(exp_file.read_text(encoding="utf-8"))
+    char = data["characterization"]
+    model = data["model"]
+
+    # Test build_ablation_profiles
+    char_stat = build_ablation_profiles(char, "static_only")
+    assert all(c["fused"]["meanConfidence"] == 0.0 for c in char_stat.values())
+
+    char_dyn = build_ablation_profiles(char, "dynamic_only")
+    assert all(c["fused"]["meanConfidence"] == 1.0 for c in char_dyn.values())
+
+    char_nophase = build_ablation_profiles(char, "no_phase")
+    assert all(len(c["fused"]["phases"]) == 1 for c in char_nophase.values())
+
+    # Instantiate policies
+    p_full = HarpPolicy(char, model)
+    p_stat = HarpStaticOnlyPolicy(char, model)
+    p_dyn = HarpDynamicOnlyPolicy(char, model)
+    p_nophase = HarpNoPhasePolicy(char, model)
+
+    tasks = sorted(char.keys())
+    assert p_full.start(tasks) == "T08"
+    assert p_stat.start(tasks) == "T08"
+
+    # Verify that different policies choose co-runners based on their respective feature views
+    rem = [t for t in tasks if t != "T08"]
+    c_full, _ = p_full.choose("T08", 0.0, rem)
+    c_stat, _ = p_stat.choose("T08", 0.0, rem)
+    assert c_full == "T01"
+    assert c_stat == "T02"
+

@@ -121,7 +121,35 @@ def _parse_functions(listing):
 
 
 def _loop_depths(instructions):
-    """Nesting depth per instruction from backward branches."""
+    """Nesting depth per instruction recovered from disassembly backward branches.
+
+    Addressing Reviewer Comment 20:
+    Mechanism:
+      In standard x86-64 code emitted by GCC/Clang, a loop back-edge manifests
+      as a conditional backward branch (e.g., jne, jb, jl) where target <= address.
+      The interval [target_address, address] defines the static instruction extent
+      of the loop body.
+      For each instruction at address A, its nesting depth is the count of enclosing
+      loop intervals:
+          depth(A) = sum_{L in loops} I(start_L <= A <= end_L)
+      Instructions within nested loops receive an exponential execution-frequency
+      weight: weight(A) = LOOP_WEIGHT ** depth(A) (with LOOP_WEIGHT = 10).
+
+    Reliability under -O2 code layout:
+      1. Loop Header Inversion: Under -O2, GCC transforms while-loops into do-while
+         structures with an entry guard jump, ensuring the loop core terminates in a
+         single backward jump. The backward interval [start, end] accurately captures
+         the loop core.
+      2. Loop Unrolling: Complete loop unrolling (for fixed small iteration counts)
+         removes the backward branch, treating those operations as straight-line code.
+         Partial unrolling preserves the backward branch while expanding the loop body,
+         retaining correct nesting depth.
+      3. Vectorization: -O2 autovectorization replaces scalar loops with SIMD blocks
+         and scalar epilogues. Both remain enclosed within backward jump structures.
+      4. Limitation: Complex unstructured control flows with multiple cross-jumping
+         exits may underestimate or overestimate loop extents. HARP-PAF treats static
+         nesting as an AOT prior, adaptively refined by dynamic hardware counters via q.
+    """
 
     if not instructions:
         return []
